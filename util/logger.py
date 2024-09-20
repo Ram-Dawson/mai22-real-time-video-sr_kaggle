@@ -44,9 +44,11 @@ _LOG_LEVEL = _interpret_level(os.getenv('VA_LOG_LEVEL', None)) if __debug__ else
 
 # enable to log streaming or file
 # at least one of streaming and file should be enabled
-_LOG_STREAM = os.getenv('VA_LOG_EN_STREAM', 'True') not in ('False', 'false', '0')
+_LOG_STREAM = os.getenv('VA_LOG_EN_STREAM', 'True') not in (
+    'False', 'false', '0')
 _LOG_FILE = os.getenv('VA_LOG_EN_FILE', 'True') not in ('False', 'false', '0')
-_LOG_FILE_PATH = constant_util.ROOT_DIR / os.getenv('VA_LOG_FILE', 'mai_vsr_logger.log')
+_LOG_FILE_PATH = constant_util.ROOT_DIR / \
+    os.getenv('VA_LOG_FILE', 'mai_vsr_logger.log')
 _LOG_FORMAT = '%(asctime)s [%(name)s:%(levelname)s] %(filename)s:%(lineno)d: %(message)s'
 assert _LOG_STREAM is True or _LOG_FILE is True, 'None of LOG_STREAM and LOG_FILE enabled'
 
@@ -55,7 +57,45 @@ _logger = None
 _lock = threading.Lock()  # lock for thread safety logger creation
 
 
-def _find_caller(stack_info=False):
+def _find_caller(stack_info=False, stacklevel=1):
+    """Track back system caller stack to find caller file, function and lineno.
+
+    Args:
+        stack_info: A bool indicates how the stack information be returned. The stack information
+            is returned as None unless `stack_info` is True. Default is False.
+        stacklevel: An int indicates how many levels to go back in the stack to find the caller.
+            Default is 1.
+
+    Returns:
+        4-element tuple, which represent caller's filename, lineno, code name, stack info.
+            Reference to `logging` for full spec.
+
+    Raises:
+        Exceptions raised during tracing caller stack.
+    """
+    try:
+        # logger_f = execute frame of this file, this function.
+        # Adjust based on stacklevel
+        logger_f = sys._getframe(3 + (stacklevel - 1))
+
+        # track back until caller frame is found
+        # this is needed because we may redirect function call within this logger.
+        caller_f = logger_f
+        while caller_f.f_code.co_filename == logger_f.f_code.co_filename:
+            caller_f = caller_f.f_back
+
+        # stack info if required
+        sinfo = None
+        if stack_info:
+            sinfo = '\n'.join(_traceback.format_stack())
+
+        # return tuple information according to logging's findCaller.
+        return (caller_f.f_code.co_filename, caller_f.f_lineno, caller_f.f_code.co_name, sinfo)
+
+    except:
+        print('Unexpected runtime caller stack.')
+        raise
+
     """Track back system caller stack to find caller file, function and lineno.
 
     Args:
