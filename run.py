@@ -57,12 +57,15 @@ def main(args):
     # prepare dataset
     dataset = dataset_builder.build_dataset(config['dataset'])
 
-    # prepare model
-    model_builder = plugin.plugin_from_file(
-        config['model']['path'], config['model']['name'], tf.keras.Model
-    )
-    common_util.copy_file(config['model']['path'], log_dir)
-    model = model_builder()
+    # prepare model with MirroredStrategy
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+        model_builder = plugin.plugin_from_file(
+            config['model']['path'], config['model']['name'], tf.keras.Model
+        )
+        common_util.copy_file(config['model']['path'], log_dir)
+        model = model_builder()
+
 
     # prepare learner
     learner = StandardLearner(config['learner'], model, dataset, log_dir)
