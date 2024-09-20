@@ -44,15 +44,12 @@ class StandardLearner():
         """
         super().__init__()
         with common_util.check_config(config['general']) as cfg:
-            self.total_steps = cfg.pop(
-                'total_steps', constant_util.MAXIMUM_TRAIN_STEPS)
+            self.total_steps = cfg.pop('total_steps', constant_util.MAXIMUM_TRAIN_STEPS)
             self.log_train_info_steps = cfg.pop(
                 'log_train_info_steps', constant_util.LOG_TRAIN_INFO_STEPS
             )
-            self.keep_ckpt_steps = cfg.pop(
-                'keep_ckpt_steps', constant_util.KEEP_CKPT_STEPS)
-            self.valid_steps = cfg.pop(
-                'valid_steps', constant_util.VALID_STEPS)
+            self.keep_ckpt_steps = cfg.pop('keep_ckpt_steps', constant_util.KEEP_CKPT_STEPS)
+            self.valid_steps = cfg.pop('valid_steps', constant_util.VALID_STEPS)
 
         self.config = config
         self.model = model
@@ -74,21 +71,18 @@ class StandardLearner():
     def register_training(self):
         """Prepare for training."""
         # prepare learning rate scheduler for training
-        lr_config = self.config['lr_scheduler'] if 'lr_scheduler' in self.config else {
-        }
+        lr_config = self.config['lr_scheduler'] if 'lr_scheduler' in self.config else {}
         module = getattr(tf.keras.optimizers.schedules, lr_config.pop('name'))
         self.lr_scheduler = module(**lr_config)
 
         # prepare optimizer for training
-        opt_config = self.config['optimizer'] if 'optimizer' in self.config else {
-        }
+        opt_config = self.config['optimizer'] if 'optimizer' in self.config else {}
         module = getattr(tf.keras.optimizers, opt_config.pop('name'))
         self.optimizer = module(learning_rate=self.lr_scheduler, **opt_config)
 
         # prepare saver to save and load checkpoints
         saver_config = self.config['saver'] if 'saver' in self.config else {}
-        self.saver = Saver(saver_config, self,
-                           is_train=True, log_dir=self.log_dir)
+        self.saver = Saver(saver_config, self, is_train=True, log_dir=self.log_dir)
 
         # prepare metric functions
         self.metric_functions['psnr'] = PSNR(data_range=255)
@@ -98,8 +92,7 @@ class StandardLearner():
         """Prepare for evaluation."""
         # prepare saver to save and load checkpoints
         saver_config = self.config['saver'] if 'saver' in self.config else {}
-        self.saver = Saver(saver_config, self,
-                           is_train=False, log_dir=self.log_dir)
+        self.saver = Saver(saver_config, self, is_train=False, log_dir=self.log_dir)
 
         # prepare metric functions
         self.metric_functions['psnr'] = PSNR(data_range=255)
@@ -150,23 +143,17 @@ class StandardLearner():
                     input_tensor = tf.concat(
                         [input_tensors[:, 0, ...], input_tensors[:, 0, ...]], axis=-1
                     )
-                    hidden_state = tf.zeros(
-                        [b, h, w, self.model.base_channels])
-                    pred_tensor, hidden_state = self.model(
-                        [input_tensor, hidden_state], training=True)
+                    hidden_state = tf.zeros([b, h, w, self.model.base_channels])
+                    pred_tensor, hidden_state = self.model([input_tensor, hidden_state], training=True)
                 else:
                     input_tensor = tf.concat(
-                        [input_tensors[:, i - 1, ...],
-                            input_tensors[:, i, ...]], axis=-1
+                        [input_tensors[:, i - 1, ...], input_tensors[:, i, ...]], axis=-1
                     )
-                    pred_tensor, hidden_state = self.model(
-                        [input_tensor, hidden_state], training=True)
-                l1_norm_loss += self.loss_fn(pred_tensor,
-                                             target_tensors[:, i, ...])
+                    pred_tensor, hidden_state = self.model([input_tensor, hidden_state], training=True)
+                l1_norm_loss += self.loss_fn(pred_tensor, target_tensors[:, i, ...])
         # Calculate gradients and update.
         gradients = tape.gradient(l1_norm_loss, self.model.trainable_variables)
-        self.optimizer.apply_gradients(
-            zip(gradients, self.model.trainable_variables))
+        self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
 
         return pred_tensor, l1_norm_loss
 
@@ -187,18 +174,15 @@ class StandardLearner():
                     [input_tensors[:, 0, ...], input_tensors[:, 0, ...]], axis=-1
                 )
                 hidden_state = tf.zeros([b, h, w, self.model.base_channels])
-                pred_tensor, hidden_state = self.model(
-                    [input_tensor, hidden_state], training=False)
+                pred_tensor, hidden_state = self.model([input_tensor, hidden_state], training=False)
             else:
                 input_tensor = tf.concat(
                     [input_tensors[:, i - 1, ...], input_tensors[:, i, ...]], axis=-1
                 )
-                pred_tensor, hidden_state = self.model(
-                    [input_tensor, hidden_state], training=False)
+                pred_tensor, hidden_state = self.model([input_tensor, hidden_state], training=False)
 
             for metric_name in self.metric_functions:
-                self.metric_functions[metric_name].update(
-                    pred_tensor, target_tensors[:, i, ...])
+                self.metric_functions[metric_name].update(pred_tensor, target_tensors[:, i, ...])
 
             pred_tensors.append(pred_tensor)
 
@@ -237,16 +221,13 @@ class StandardLearner():
                 with self.summary.as_default(step=self.step):
                     logger.info(f'Step {self.step} train loss: {loss}')
                     tf.summary.scalar('train_loss', loss)
-                    tf.summary.scalar('learning_rate', self.optimizer.learning_rate(
-                        self.optimizer.iterations))
+                    tf.summary.scalar('learning_rate', self.optimizer.lr(self.optimizer.iterations))
                     tf.summary.image('pred', [pred[0] / 255.0])
                     tf.summary.image(
                         'input',
-                        [data_pair[0][0, -2, ...] / 255.0,
-                            data_pair[0][0, -1, ...] / 255.0]
+                        [data_pair[0][0, -2, ...] / 255.0, data_pair[0][0, -1, ...] / 255.0]
                     )
-                    tf.summary.image(
-                        'target', [data_pair[1][0, -1, ...] / 255.0])
+                    tf.summary.image('target', [data_pair[1][0, -1, ...] / 255.0])
                 self.summary.flush()
 
             # save checkpoint every n steps
@@ -285,8 +266,7 @@ class StandardLearner():
             pred_tensors = self.test_step(data_pair)
             for j, pred_tensor in enumerate(pred_tensors):
                 tf.keras.utils.save_img(
-                    save_path / f'{str(i).zfill(3)
-                                   }_{str(j).zfill(8)}.png', pred_tensor[0]
+                    save_path / f'{str(i).zfill(3)}_{str(j).zfill(8)}.png', pred_tensor[0]
                 )
 
         # log the evaluation results
