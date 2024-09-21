@@ -229,6 +229,8 @@ class StandardLearner():
                     )
                     tf.summary.image('target', [data_pair[1][0, -1, ...] / 255.0])
                 self.summary.flush()
+                 # 清理计算图
+                tf.keras.backend.clear_session()
 
             # save checkpoint every n steps
             if self.step % self.keep_ckpt_steps == 0:
