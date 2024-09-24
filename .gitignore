@@ -5,3 +5,7 @@
 *.log
 /model/__pycache__
 /results
+/dataset/REDS
+/util/__pycache__
+/learner/__pycache__
+/dataset/__pycache__
